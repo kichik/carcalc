@@ -1,0 +1,715 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Car Swap Calculator</title>
+<meta name="description" content="Compare a nicer car traded in every few years against a cheaper car kept longer, with the unused money optionally invested.">
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --ink: #1b1f24; --muted: #5d6673; --line: #e3e6ea;
+  --accent: #2f6fde; --a: #7b4fd6; --b: #1f8a6c;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111418; --panel: #1a1e24; --ink: #e8ebef; --muted: #9aa3ae; --line: #2a3038;
+    --accent: #6c9ef5; --a: #a98af0; --b: #4cc2a0;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111418; --panel: #1a1e24; --ink: #e8ebef; --muted: #9aa3ae; --line: #2a3038;
+  --accent: #6c9ef5; --a: #a98af0; --b: #4cc2a0;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+header { max-width: 1200px; margin: 0 auto; padding: 24px 16px 8px; }
+h1 { margin: 0 0 4px; font-size: 24px; }
+header p { margin: 0; color: var(--muted); }
+main {
+  max-width: 1200px; margin: 0 auto; padding: 16px;
+  display: grid; grid-template-columns: 380px 1fr; gap: 16px; align-items: start;
+}
+main > section { min-width: 0; }
+@media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+.controls { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; }
+@media (max-width: 900px) { .controls { position: static; max-height: none; } }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.presets button, .btn, .tabs button {
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+  padding: 5px 10px; border-radius: 999px; cursor: pointer; font: inherit; font-size: 13px;
+}
+.presets button:hover, .btn:hover, .tabs button:hover { border-color: var(--accent); }
+.presets button.active, .tabs button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.invest {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin: 8px 0 4px;
+  border: 1px solid var(--accent); border-radius: 8px; cursor: pointer; font-weight: 600;
+}
+.invest input { width: 18px; height: 18px; accent-color: var(--accent); }
+.invest .muted { font-weight: 400; font-size: 12px; }
+.include { margin: 8px 0 4px; font-size: 13px; }
+.include .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.include label {
+  display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 6px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--bg);
+}
+.include label:has(input:not(:checked)) { color: var(--muted); text-decoration: line-through; }
+.include input { accent-color: var(--accent); margin: 0; }
+details { border-top: 1px solid var(--line); padding: 8px 0; }
+summary { cursor: pointer; font-weight: 600; padding: 4px 0; list-style: none; }
+summary::-webkit-details-marker { display: none; }
+summary::before { content: "▸ "; color: var(--muted); }
+details[open] summary::before { content: "▾ "; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--c); margin-right: 4px; }
+.field { margin: 10px 0; }
+.field .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.field .hint { color: var(--muted); font-size: 12px; }
+.field input[type=number], .field input[type=text] {
+  width: 110px; text-align: right; padding: 3px 6px; font: inherit;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink);
+}
+.field input[type=text] { width: 160px; text-align: left; }
+.field input[type=range] { width: 100%; margin: 6px 0 0; accent-color: var(--accent); }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+.card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.card .value { font-size: 24px; font-weight: 650; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.card .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.verdict { font-size: 16px; margin-bottom: 16px; }
+.ca { color: var(--a); } .cb { color: var(--b); }
+h2 { font-size: 16px; margin: 0; }
+.chart-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.chart-wrap { position: relative; }
+svg { display: block; width: 100%; height: auto; }
+.legend { display: flex; gap: 16px; color: var(--muted); font-size: 13px; margin-top: 6px; flex-wrap: wrap; }
+.legend .ln::before { content: ""; display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 6px; background: var(--c); }
+.legend .dash::before { background: repeating-linear-gradient(90deg, var(--c) 0 4px, transparent 4px 7px); }
+.legend .tri::before { content: "▲"; color: var(--muted); margin-right: 4px; font-size: 10px; }
+.tip {
+  position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.15);
+  display: none; white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.grid2 > * { min-width: 0; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+td, th { padding: 5px 4px; border-bottom: 1px solid var(--line); text-align: right; }
+td:first-child, th:first-child { text-align: left; }
+th { color: var(--muted); font-weight: 500; font-size: 12px; }
+tr.total td { font-weight: 650; border-bottom: 0; }
+.muted { color: var(--muted); }
+.table-scroll { overflow-x: auto; }
+footer { max-width: 1200px; margin: 0 auto; padding: 8px 16px 32px; color: var(--muted); font-size: 12px; }
+.actions { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Car Swap Calculator</h1>
+  <p>A nicer car traded in every few years vs. a cheaper car you keep longer. You pay the same amount each month either way; whoever's car costs less that month keeps the difference.</p>
+</header>
+
+<main>
+  <section class="panel controls">
+    <div class="presets" id="presets"></div>
+    <label class="invest">
+      <input type="checkbox" id="invest">
+      <span>Invest unused money<br><span class="muted">Off: the savings sit in cash earning nothing</span></span>
+    </label>
+    <div class="include">
+      <span class="muted">Include in the comparison (untick for a simpler one):</span>
+      <div class="chips" id="include"></div>
+    </div>
+    <div id="fields"></div>
+    <div class="actions">
+      <button class="btn" id="share">Copy share link</button>
+      <button class="btn" id="reset">Reset</button>
+      <button class="btn" id="theme">Toggle theme</button>
+    </div>
+  </section>
+
+  <section>
+    <div class="verdict panel" id="verdict"></div>
+    <div class="cards" id="cards"></div>
+
+    <div class="panel">
+      <div class="chart-head">
+        <h2 id="chartTitle">Net worth over time</h2>
+        <div class="tabs" id="tabs">
+          <button data-view="nw" class="active">Net worth</button>
+          <button data-view="gap">Gap</button>
+          <button data-view="spent">Cumulative spent</button>
+        </div>
+      </div>
+      <div class="chart-wrap">
+        <svg id="chart" viewBox="0 0 800 360" role="img" aria-label="Chart comparing the two car strategies over time"></svg>
+        <div class="tip" id="tip"></div>
+      </div>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <div class="grid2">
+      <div class="panel">
+        <h2 style="margin-bottom:10px">Total cost of ownership</h2>
+        <div class="table-scroll"><table id="tco"></table></div>
+      </div>
+      <div class="panel">
+        <h2 style="margin-bottom:10px">Typical month</h2>
+        <div class="table-scroll"><table id="monthly"></table></div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:16px">
+      <h2 style="margin-bottom:4px">Car by car: what each one lost in value</h2>
+      <p class="muted" style="margin:0 0 10px">The value drop builds up the whole time you own a car. In cash, you feel it at the swap, when the trade-in comes back far below what you paid.</p>
+      <div style="display:grid;gap:16px">
+        <div class="table-scroll"><table id="cyclesA"></table></div>
+        <div class="table-scroll"><table id="cyclesB"></table></div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:16px">
+      <h2 style="margin-bottom:10px">Year by year</h2>
+      <div class="table-scroll"><table id="yearly"></table></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  How it works: the calculator steps through every month. Each month it adds up both strategies' car costs: purchases (net of trade-in, plus sales tax), loan payments,
+  insurance, maintenance, fuel and registration. Whichever strategy spent less that month puts the difference aside. With "Invest unused money" on, that money earns the
+  investment return; with it off, it sits in cash. Net worth = savings + what the car would fetch as a trade-in − what's left on the loan.
+  A loan still open at trade-in time is paid off at the swap: the trade-in covers what it can and the rest is rolled into the new loan (or paid in cash if the next car is bought outright). A car's value drops by the first-year % in year one, then by the yearly % after that.
+  Insurance = a liability amount that rises with inflation, plus collision & comprehensive at a % of the car's current value, so it drops as the car ages.
+  Maintenance starts at the base amount and goes up by the per-year amount each year the car ages. Taxes on investment gains are not modeled. This is not financial advice.
+</footer>
+
+<script>
+const carFields = (p) => [
+  { id: p + "name", label: "Name", type: "text" },
+  { id: p + "price", label: "Purchase price (today's $)", min: 3000, max: 200000, step: 500, fmt: "$" },
+  { id: p + "age", label: "Car age when bought", min: 0, max: 10, step: 1, hint: "0 = new. Use 2–4 for a lightly used car" },
+  { id: p + "keep", label: "Keep for (years)", min: 1, max: 20, step: 1 },
+  { id: p + "d1", label: "First-year depreciation", min: 0, max: 40, step: 1, fmt: "%", hint: "Only applies if bought new" },
+  { id: p + "d", label: "Yearly depreciation after", min: 0, max: 30, step: 0.5, fmt: "%" },
+  { id: p + "term", label: "Loan term (years)", min: 0, max: 8, step: 1, hint: "0 = pay cash" },
+  { id: p + "rate", label: "Loan rate", min: 0, max: 20, step: 0.1, fmt: "%" },
+  { id: p + "down", label: "Down payment", min: 0, max: 100, step: 1, fmt: "%", hint: "Paid on top of the trade-in" },
+  { id: p + "insPct", label: "Collision & comprehensive insurance", min: 0, max: 8, step: 0.1, fmt: "%", hint: "% of the car's current value per year. Pricier cars cost more to repair, so use a higher rate. This part shrinks as the car loses value" },
+  { id: p + "mBase", label: "Maintenance, first year", min: 0, max: 5000, step: 50, fmt: "$", hint: "$ per year when the car is new: oil, tires, brakes" },
+  { id: p + "mGrow", label: "Maintenance increase per year of age", min: 0, max: 1000, step: 10, fmt: "$", hint: "Older cars cost more to keep running" },
+  { id: p + "mpg", label: "MPG", min: 5, max: 150, step: 1, hint: "For an EV, use MPGe-equivalent at your electricity price" },
+];
+
+const FIELDS = [
+  { group: "Car A", color: "--a", open: true, items: carFields("a_") },
+  { group: "Car B", color: "--b", open: true, items: carFields("b_") },
+  { group: "Shared", items: [
+    { id: "years", label: "Years to compare", min: 5, max: 50, step: 1, hint: "Pick a multiple of both keep times for a clean comparison" },
+    { id: "ret", label: "Investment return", min: 0, max: 12, step: 0.1, fmt: "%", hint: "per year, nominal" },
+    { id: "miles", label: "Miles per year", min: 0, max: 40000, step: 500 },
+    { id: "gas", label: "Gas price", min: 1, max: 8, step: 0.05, fmt: "$", hint: "$ per gallon" },
+    { id: "insLiab", label: "Insurance, liability part", min: 0, max: 5000, step: 50, fmt: "$", hint: "$ per year. Depends on the driver, not the car, so it's the same for both" },
+    { id: "insDrop", label: "Drop collision when car is worth under", min: 0, max: 20000, step: 500, fmt: "$", hint: "0 = keep full coverage forever" },
+    { id: "salesTax", label: "Sales tax", min: 0, max: 12, step: 0.25, fmt: "%", hint: "Charged on price minus trade-in" },
+    { id: "regFlat", label: "Registration, flat", min: 0, max: 1000, step: 10, fmt: "$", hint: "$ per year" },
+    { id: "regPct", label: "Registration / property tax on value", min: 0, max: 3, step: 0.05, fmt: "%", hint: "% of car value per year (VA, CA, CO, etc.)" },
+    { id: "tradeDisc", label: "Trade-in haircut", min: 0, max: 30, step: 1, fmt: "%", hint: "How far below market value a dealer pays" },
+    { id: "carInf", label: "Car price inflation", min: 0, max: 8, step: 0.1, fmt: "%" },
+    { id: "costInf", label: "Insurance & maintenance inflation", min: 0, max: 10, step: 0.1, fmt: "%" },
+    { id: "fuelInf", label: "Fuel price inflation", min: 0, max: 8, step: 0.1, fmt: "%" },
+  ]},
+];
+
+const FIELD_BY_ID = Object.fromEntries(FIELDS.flatMap((g) => g.items).map((f) => [f.id, f]));
+// Keep numbers inside each knob's range so typed values and share links can't break the math.
+function clampField(id, v) {
+  const f = FIELD_BY_ID[id];
+  if (!f || f.type === "text") return v;
+  v = Math.min(f.max, Math.max(f.min, v));
+  return f.step >= 1 ? Math.round(v / f.step) * f.step : v;
+}
+
+const DEFAULTS = {
+  a_name: "Nicer car", a_price: 55000, a_age: 0, a_keep: 5, a_d1: 20, a_d: 15, a_term: 5, a_rate: 6.5, a_down: 10,
+  a_insPct: 2.8, a_mBase: 500, a_mGrow: 200, a_mpg: 24,
+  b_name: "Cheaper car", b_price: 28000, b_age: 0, b_keep: 10, b_d1: 15, b_d: 12, b_term: 5, b_rate: 6.5, b_down: 10,
+  b_insPct: 2.4, b_mBase: 400, b_mGrow: 150, b_mpg: 32,
+  years: 30, ret: 7, insLiab: 900, insDrop: 0, miles: 12000, gas: 3.4, salesTax: 7, regFlat: 150, regPct: 0.3, tradeDisc: 10,
+  carInf: 3, costInf: 3, fuelInf: 2.5, invest: 1,
+};
+
+const INCLUDES = [
+  ["inc_ins", "Insurance"], ["inc_fuel", "Fuel"], ["inc_maint", "Maintenance"],
+  ["inc_reg", "Registration"], ["inc_tax", "Sales tax"],
+];
+INCLUDES.forEach(([k]) => (DEFAULTS[k] = 1));
+
+// Knobs that only matter when their cost is included. A knob listed under several is shown if any of them is on.
+const KNOBS_FOR = {
+  inc_ins: ["a_insPct", "b_insPct", "insLiab", "insDrop", "costInf"],
+  inc_fuel: ["a_mpg", "b_mpg", "miles", "gas", "fuelInf"],
+  inc_maint: ["a_mBase", "a_mGrow", "b_mBase", "b_mGrow", "costInf"],
+  inc_reg: ["regFlat", "regPct", "costInf"],
+  inc_tax: ["salesTax"],
+};
+function applyVisibility() {
+  const show = {};
+  for (const [k, ids] of Object.entries(KNOBS_FOR)) ids.forEach((id) => (show[id] = show[id] || !!state[k]));
+  for (const [id, on] of Object.entries(show)) {
+    const el = document.querySelector(`[data-field="${id}"]`);
+    if (el) el.hidden = !on;
+  }
+}
+
+const PRESETS = {
+  "Nicer vs basic": {},
+  "Luxury every 4 vs Corolla for 12": {
+    a_name: "Luxury SUV", a_price: 80000, a_keep: 4, a_d1: 25, a_d: 16, a_insPct: 3.6, a_mBase: 900, a_mGrow: 300, a_mpg: 22,
+    b_name: "Corolla", b_price: 25000, b_keep: 12, b_d1: 12, b_d: 11, b_mpg: 35, years: 24,
+  },
+  "New truck vs used commuter": {
+    a_name: "New truck", a_price: 65000, a_d1: 15, a_d: 12, a_insPct: 2.4, a_mBase: 600, a_mGrow: 200, a_mpg: 18,
+    b_name: "3-yr-old Civic", b_price: 20000, b_age: 3, b_keep: 10, b_d: 11, b_mBase: 700, b_mGrow: 160, b_mpg: 34,
+  },
+  "Both pay cash": { a_term: 0, b_term: 0 },
+  "0.9% promo financing": { a_rate: 0.9, b_rate: 0.9 },
+  "Drive it into the ground (15 yrs)": { b_keep: 15 },
+  "Swap every 3 years": { a_keep: 3, years: 30 },
+  "Drop collision under $10k": { insDrop: 10000 },
+  "Price & loan only": { inc_ins: 0, inc_fuel: 0, inc_maint: 0, inc_reg: 0, inc_tax: 0 },
+  "Investing off": { invest: 0 },
+};
+
+let state = { ...DEFAULTS };
+let view = "nw";
+const $ = (s) => document.querySelector(s);
+const nm = (p) => escapeHtml(state[p + "name"] || (p === "a_" ? "Car A" : "Car B"));
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+const usd = (v) => (v < 0 ? "-$" : "$") + Math.round(Math.abs(v)).toLocaleString("en-US");
+const usdK = (v) => {
+  const a = Math.abs(v), s = v < 0 ? "-$" : "$";
+  if (a >= 1e6) return s + (a / 1e6).toFixed(a >= 1e7 ? 1 : 2) + "M";
+  if (a >= 1e3) return s + Math.round(a / 1e3) + "k";
+  return s + Math.round(a);
+};
+
+// ---------- UI ----------
+function buildFields() {
+  const root = $("#fields");
+  FIELDS.forEach((g) => {
+    const d = document.createElement("details");
+    d.open = !!g.open;
+    const sum = document.createElement("summary");
+    if (g.color) {
+      sum.innerHTML = `<span class="dot" style="--c:var(${g.color})"></span><span data-title="${g.items[0].id}"></span>`;
+    } else sum.textContent = g.group;
+    d.appendChild(sum);
+    g.items.forEach((f) => {
+      const w = document.createElement("div");
+      w.className = "field";
+      w.dataset.field = f.id;
+      if (f.type === "text") {
+        w.innerHTML = `<div class="top"><label for="n_${f.id}">${f.label}</label><input type="text" id="n_${f.id}" maxlength="30"></div>`;
+        d.appendChild(w);
+        const n = w.querySelector("input");
+        n.addEventListener("input", () => { state[f.id] = n.value; clearPreset(); update(); });
+        return;
+      }
+      w.innerHTML = `
+        <div class="top">
+          <label for="n_${f.id}">${f.label}</label>
+          <span>${f.fmt === "$" ? '<span class="muted">$</span>' : ""}<input type="number" id="n_${f.id}" step="${f.step}" min="${f.min}">${f.fmt === "%" ? '<span class="muted"> %</span>' : ""}</span>
+        </div>
+        <input type="range" id="r_${f.id}" min="${f.min}" max="${f.max}" step="${f.step}" aria-label="${f.label}">
+        ${f.hint ? `<div class="hint">${f.hint}</div>` : ""}`;
+      d.appendChild(w);
+      const n = w.querySelector("input[type=number]"), r = w.querySelector("input[type=range]");
+      const set = (v, src) => {
+        v = parseFloat(v);
+        if (!isFinite(v)) return;
+        v = clampField(f.id, v);
+        state[f.id] = v;
+        if (src !== n) n.value = v;
+        if (src !== r) r.value = v;
+        clearPreset();
+        update();
+      };
+      n.addEventListener("input", () => set(n.value, n));
+      n.addEventListener("change", () => (n.value = state[f.id]));   // show the clamped value once editing ends
+      r.addEventListener("input", () => set(r.value, r));
+    });
+    root.appendChild(d);
+  });
+
+  INCLUDES.forEach(([k, label]) => {
+    const l = document.createElement("label");
+    l.innerHTML = `<input type="checkbox" id="c_${k}"> ${label}`;
+    l.querySelector("input").addEventListener("change", (e) => { state[k] = e.target.checked ? 1 : 0; clearPreset(); update(); });
+    $("#include").appendChild(l);
+  });
+  $("#invest").addEventListener("change", (e) => { state.invest = e.target.checked ? 1 : 0; clearPreset(); update(); });
+
+  const p = $("#presets");
+  Object.keys(PRESETS).forEach((name) => {
+    const b = document.createElement("button");
+    b.textContent = name;
+    b.addEventListener("click", () => {
+      state = { ...DEFAULTS, ...PRESETS[name] };
+      syncInputs();
+      document.querySelectorAll("#presets button").forEach((x) => x.classList.toggle("active", x === b));
+      update();
+    });
+    p.appendChild(b);
+  });
+
+  document.querySelectorAll("#tabs button").forEach((b) => b.addEventListener("click", () => {
+    view = b.dataset.view;
+    document.querySelectorAll("#tabs button").forEach((x) => x.classList.toggle("active", x === b));
+    update();
+  }));
+}
+function clearPreset() { document.querySelectorAll("#presets button.active").forEach((x) => x.classList.remove("active")); }
+function syncInputs() {
+  for (const k in state) {
+    const n = $("#n_" + k), r = $("#r_" + k);
+    if (n) n.value = state[k];
+    if (r) r.value = state[k];
+  }
+  $("#invest").checked = !!state.invest;
+  INCLUDES.forEach(([k]) => ($("#c_" + k).checked = !!state[k]));
+}
+
+// ---------- model ----------
+// Fraction of original-new value remaining at a given age (years, fractional).
+function valueCurve(age, d1, d) {
+  if (age <= 0) return 1;
+  if (age <= 1) return 1 - d1 * age;
+  return (1 - d1) * Math.pow(1 - d, age - 1);
+}
+
+// Monthly cash flows for one strategy.
+function simCar(p, s) {
+  const c = (k) => s[p + k];
+  const months = s.years * 12;
+  const d1 = c("d1") / 100, d = c("d") / 100;
+  const r = c("rate") / 100 / 12, nTerm = Math.round(c("term") * 12);
+  const out = new Array(months + 1).fill(0);
+  const value = new Array(months + 1).fill(0);   // trade-in value at end of month
+  const loan = new Array(months + 1).fill(0);
+  const tot = { purchases: 0, tradeIns: 0, tax: 0, interest: 0, ins: 0, maint: 0, fuel: 0, reg: 0 };
+  const buys = [];
+
+  let paid = 0, startAge = c("age"), owned = 0, bal = 0, pmt = 0, left = 0;
+  const marketValue = () => paid * valueCurve(startAge + owned / 12, d1, d) / valueCurve(startAge, d1, d);
+  const tradeValue = () => marketValue() * (1 - s.tradeDisc / 100);
+
+  const buy = (m) => {
+    const trade = paid ? tradeValue() : 0;
+    const price = c("price") * Math.pow(1 + s.carInf / 100, m / 12);
+    const tax = Math.max(0, price - trade) * s.salesTax / 100 * s.inc_tax;
+    const payoff = bal;
+    // Trade-in equity (or negative equity) goes against the loan; the down payment is cash on top.
+    const owed = price + tax - trade + payoff;
+    let financed = 0;
+    if (nTerm > 0) financed = Math.max(0, owed - price * c("down") / 100);
+    out[m] += owed - financed;
+    tot.purchases += price; tot.tradeIns += trade; tot.tax += tax;
+    buys.push({ m, price, trade });
+    bal = financed; left = nTerm;
+    pmt = financed <= 0 ? 0 : r === 0 ? financed / nTerm : financed * r / (1 - Math.pow(1 + r, -nTerm));
+    paid = price; owned = 0;
+  };
+
+  buy(0);
+  value[0] = tradeValue(); loan[0] = bal;
+  const keepM = c("keep") * 12;
+
+  for (let m = 1; m <= months; m++) {
+    const yrs = (m - 1) / 12;
+    const age = startAge + owned / 12;          // age during this month
+    const costInf = Math.pow(1 + s.costInf / 100, yrs);
+    // loan
+    if (left > 0 && bal > 0) {
+      const interest = bal * r;
+      const principal = Math.min(pmt - interest, bal);
+      out[m] += interest + principal;
+      tot.interest += interest;
+      bal -= principal; left--;
+      if (left === 0) bal = 0;
+    }
+    const mv = marketValue();
+    const ins = (s.insLiab * costInf + (mv >= s.insDrop ? mv * c("insPct") / 100 : 0)) / 12 * s.inc_ins;
+    const maint = (c("mBase") + c("mGrow") * age) * costInf / 12 * s.inc_maint;
+    const fuel = s.miles / c("mpg") * s.gas * Math.pow(1 + s.fuelInf / 100, yrs) / 12 * s.inc_fuel;
+    const reg = (s.regFlat * costInf + mv * s.regPct / 100) / 12 * s.inc_reg;
+    out[m] += ins + maint + fuel + reg;
+    tot.ins += ins; tot.maint += maint; tot.fuel += fuel; tot.reg += reg;
+
+    owned++;
+    if (owned >= keepM && m < months) { startAge = c("age"); buy(m); }
+    value[m] = tradeValue();
+    loan[m] = bal;
+  }
+  return { out, value, loan, tot, buys };
+}
+
+function simulate(s) {
+  const A = simCar("a_", s), B = simCar("b_", s);
+  const months = s.years * 12;
+  const run = (invest) => {
+    const g = invest ? Math.pow(1 + s.ret / 100, 1 / 12) - 1 : 0;
+    let pa = 0, pb = 0, ca = 0, cb = 0;
+    const rows = [];
+    for (let m = 0; m <= months; m++) {
+      pa *= 1 + g; pb *= 1 + g;
+      const diff = A.out[m] - B.out[m];
+      if (diff > 0) pb += diff; else pa -= diff;
+      ca += A.out[m]; cb += B.out[m];
+      rows.push({
+        m, pa, pb, ca, cb,
+        nwA: pa + A.value[m] - A.loan[m],
+        nwB: pb + B.value[m] - B.loan[m],
+      });
+    }
+    return rows;
+  };
+  return { A, B, rows: run(!!s.invest), cash: run(false), invested: run(true) };
+}
+
+// ---------- render ----------
+function update() {
+  applyVisibility();
+  const s = state, res = simulate(s);
+  const rows = res.rows, last = rows[rows.length - 1];
+  const gap = last.nwB - last.nwA;
+  const lastCash = res.cash[res.cash.length - 1], lastInv = res.invested[res.invested.length - 1];
+  const gapCash = lastCash.nwB - lastCash.nwA, gapInv = lastInv.nwB - lastInv.nwA;
+  const A = nm("a_"), B = nm("b_");
+
+  document.querySelectorAll("[data-title]").forEach((el) => {
+    const p = el.dataset.title.slice(0, 2);
+    el.textContent = `${p === "a_" ? "Car A" : "Car B"}: ${state[p + "name"] || ""}`;
+  });
+
+  const winner = gap >= 0 ? `<b class="cb">${B}</b>` : `<b class="ca">${A}</b>`;
+  $("#verdict").innerHTML = `After <b>${s.years} years</b>, the ${winner} plan leaves you about <b>${usd(Math.abs(gap))}</b> richer
+    ${s.invest ? `with the savings invested at ${s.ret}%.` : `with the savings kept as cash.`}
+    <span class="muted">${s.invest ? `Uninvested, the gap would be ${usd(Math.abs(gapCash))}.` : `Investing it at ${s.ret}% would make the gap ${usd(Math.abs(gapInv))}.`}</span>`;
+
+  const tcoA = tco(res.A, res.A.value[res.A.value.length - 1]), tcoB = tco(res.B, res.B.value[res.B.value.length - 1]);
+  const extraPerMo = (tcoA.total - tcoB.total) / (s.years * 12);
+  $("#cards").innerHTML = [
+    card(`Cars bought`, `<span class="ca">${res.A.buys.length}</span> / <span class="cb">${res.B.buys.length}</span>`, `${A} / ${B}`),
+    card("Total cost of ownership", `<span class="ca">${usdK(tcoA.total)}</span> / <span class="cb">${usdK(tcoB.total)}</span>`, "cash spent minus what the last car is worth"),
+    card(`What ${A} costs extra`, usd(Math.abs(extraPerMo)) + "/mo", extraPerMo >= 0 ? `averaged over ${s.years} years, not counting investment growth` : `${A} is actually cheaper`),
+    card(`Net worth at year ${s.years}`, `<span class="ca">${usdK(last.nwA)}</span> / <span class="cb">${usdK(last.nwB)}</span>`, s.invest ? "invested savings + car value" : "cash savings + car value"),
+    card("Gap from investing alone", usd(Math.abs(gapInv - gapCash)), `extra gap from investing at ${s.ret}% vs keeping cash`),
+  ].join("");
+
+  // TCO table
+  const lines = [
+    ["Depreciation", tcoA.dep, tcoB.dep],
+    ["Sales tax", res.A.tot.tax, res.B.tot.tax],
+    ["Loan interest", res.A.tot.interest, res.B.tot.interest],
+    ["Insurance", res.A.tot.ins, res.B.tot.ins],
+    ["Maintenance & repairs", res.A.tot.maint, res.B.tot.maint],
+    ["Fuel", res.A.tot.fuel, res.B.tot.fuel],
+    ["Registration", res.A.tot.reg, res.B.tot.reg],
+  ];
+  const skipped = { "Sales tax": "inc_tax", "Insurance": "inc_ins", "Maintenance & repairs": "inc_maint", "Fuel": "inc_fuel", "Registration": "inc_reg" };
+  const shown = lines.filter(([k]) => !skipped[k] || s[skipped[k]]);
+  const left = lines.filter(([k]) => skipped[k] && !s[skipped[k]]).map(([k]) => k.toLowerCase());
+  $("#tco").innerHTML = `<tr><th>${s.years} years</th><th class="ca">${A}</th><th class="cb">${B}</th><th>Diff</th></tr>` +
+    shown.map(([k, a, b]) => `<tr><td>${k}</td><td>${usd(a)}</td><td>${usd(b)}</td><td>${usd(a - b)}</td></tr>`).join("") +
+    `<tr class="total"><td>Total</td><td>${usd(tcoA.total)}</td><td>${usd(tcoB.total)}</td><td>${usd(tcoA.total - tcoB.total)}</td></tr>` +
+    `<tr><td colspan="4" class="muted" style="text-align:left">Depreciation = what you paid for every car − trade-ins received − trade-in value of the car you have at the end.${left.length ? ` Not included: ${left.join(", ")}.` : ""}</td></tr>`;
+
+  // Typical month: first-year average, and average over whole horizon
+  const avg = (arr, from, to) => arr.slice(from, to).reduce((x, y) => x + y, 0) / (to - from);
+  const months = s.years * 12;
+  const yr1A = avg(res.A.out, 1, 13), yr1B = avg(res.B.out, 1, 13);
+  const allA = avg(res.A.out, 0, months + 1) * (months + 1) / months, allB = avg(res.B.out, 0, months + 1) * (months + 1) / months;
+  const peakA = Math.max(...res.A.out.slice(1)), peakB = Math.max(...res.B.out.slice(1));
+  $("#monthly").innerHTML = `<tr><th></th><th class="ca">${A}</th><th class="cb">${B}</th></tr>` +
+    `<tr><td>Upfront at first purchase</td><td>${usd(res.A.out[0])}</td><td>${usd(res.B.out[0])}</td></tr>` +
+    `<tr><td>Monthly, year 1</td><td>${usd(yr1A)}</td><td>${usd(yr1B)}</td></tr>` +
+    `<tr><td>Monthly, ${s.years}-year average</td><td>${usd(allA)}</td><td>${usd(allB)}</td></tr>` +
+    `<tr><td>Biggest single month <span class="muted">(usually a swap)</span></td><td>${usd(peakA)}</td><td>${usd(peakB)}</td></tr>` +
+    `<tr><td colspan="3" class="muted" style="text-align:left">Monthly = loan payment + insurance + maintenance + fuel + registration, plus any cash due at a swap.</td></tr>`;
+
+  // yearly
+  let yt = `<tr><th>Year</th><th class="ca">${A} spent</th><th class="cb">${B} spent</th><th class="ca">${A} NW</th><th class="cb">${B} NW</th><th>Ahead</th></tr>`;
+  for (let y = 1; y <= s.years; y++) {
+    const r = rows[y * 12], from = (y - 1) * 12 + (y === 1 ? 0 : 1), to = y * 12 + 1;
+    const sa = res.A.out.slice(from, to).reduce((a, b) => a + b, 0), sb = res.B.out.slice(from, to).reduce((a, b) => a + b, 0);
+    const swapA = res.A.buys.some((b) => b.m > (y - 1) * 12 && b.m <= y * 12) ? " 🔁" : "";
+    const swapB = res.B.buys.some((b) => b.m > (y - 1) * 12 && b.m <= y * 12) ? " 🔁" : "";
+    const dd = r.nwB - r.nwA;
+    yt += `<tr><td>${y}</td><td>${usd(sa)}${swapA}</td><td>${usd(sb)}${swapB}</td><td>${usdK(r.nwA)}</td><td>${usdK(r.nwB)}</td><td class="${dd >= 0 ? "cb" : "ca"}">${dd >= 0 ? B : A} +${usdK(Math.abs(dd))}</td></tr>`;
+  }
+  $("#yearly").innerHTML = yt;
+
+  $("#cyclesA").innerHTML = cycleTable(res.A, "a_", A);
+  $("#cyclesB").innerHTML = cycleTable(res.B, "b_", B);
+
+  drawChart(res);
+  try { history.replaceState(null, "", "#" + encodeState()); } catch (e) {}
+}
+function cycleTable(car, p, name) {
+  const endM = state.years * 12, endValue = car.value[endM];
+  let tot = 0;
+  const rows = car.buys.map((b, i) => {
+    const next = car.buys[i + 1];
+    const out = next ? next.trade : endValue;
+    const toM = next ? next.m : endM;
+    const lost = b.price - out;
+    tot += lost;
+    const yrs = (toM - b.m) / 12;
+    return `<tr><td>#${i + 1} <span class="muted">yr ${(b.m / 12).toFixed(0)}–${(toM / 12).toFixed(0)}${next ? "" : " (still own)"}</span></td>
+      <td>${usd(b.price)}</td><td>${usd(out)}</td><td>${usd(lost)}</td><td class="muted">${usd(lost / Math.max(yrs, 1 / 12))}</td></tr>`;
+  });
+  return `<tr><th class="${p === "a_" ? "ca" : "cb"}">${name}</th><th>Paid</th><th>Trade-in</th><th>Lost</th><th>Per year</th></tr>` + rows.join("") +
+    `<tr class="total"><td>Total</td><td></td><td></td><td>${usd(tot)}</td><td class="muted">${usd(tot / state.years)}</td></tr>` +
+    `<tr><td colspan="5" class="muted" style="text-align:left">Prices go up with car-price inflation. "Still own" shows what the last car would fetch as a trade-in today.</td></tr>`;
+}
+function tco(car, endValue) {
+  const dep = car.tot.purchases - car.tot.tradeIns - endValue;
+  const t = car.tot;
+  return { dep, total: dep + t.tax + t.interest + t.ins + t.maint + t.fuel + t.reg };
+}
+const card = (l, v, sub) => `<div class="card"><div class="label">${l}</div><div class="value">${v}</div><div class="sub">${sub}</div></div>`;
+
+function drawChart(res) {
+  const s = state, svg = $("#chart"), W = 800, H = 360, pl = 64, pr = 16, pt = 16, pb = 40;
+  const A = nm("a_"), B = nm("b_");
+  const rows = res.rows.filter((r) => r.m % 3 === 0 || r.m === res.rows.length - 1);
+  let series, title;   // series labels are HTML: names are already escaped by nm()
+  if (view === "nw") {
+    title = "Net worth over time";
+    series = [
+      { k: "nwA", c: "--a", label: `${A}: savings + car value` },
+      { k: "nwB", c: "--b", label: `${B}: savings + car value` },
+    ];
+  } else if (view === "gap") {
+    title = `How far ahead ${B} is`;
+    const cashBy = Object.fromEntries(res.cash.map((r) => [r.m, r]));
+    const invBy = Object.fromEntries(res.invested.map((r) => [r.m, r]));
+    rows.forEach((r) => { r.gapInv = invBy[r.m].nwB - invBy[r.m].nwA; r.gapCash = cashBy[r.m].nwB - cashBy[r.m].nwA; });
+    series = [
+      { k: "gapInv", c: "--accent", label: `Savings invested at ${s.ret}%` },
+      { k: "gapCash", c: "--accent", dash: true, label: "Savings kept as cash" },
+    ];
+  } else {
+    title = "Cumulative cash spent on cars";
+    series = [
+      { k: "ca", c: "--a", label: A },
+      { k: "cb", c: "--b", label: B },
+    ];
+  }
+  $("#chartTitle").textContent = title;
+  $("#legend").innerHTML = series.map((x) => `<span class="ln ${x.dash ? "dash" : ""}" style="--c:var(${x.c})">${x.label}</span>`).join("") +
+    (view !== "gap" ? `<span class="tri">car purchase</span>` : "");
+
+  const all = rows.flatMap((r) => series.map((x) => r[x.k]));
+  let lo = Math.min(0, ...all), hi = Math.max(0, ...all);
+  if (hi === lo) hi = lo + 1;
+  const step = niceStep((hi - lo) / 5);
+  lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step;
+  const xMax = s.years * 12;
+  const X = (m) => pl + (m / xMax) * (W - pl - pr);
+  const Y = (v) => pt + (1 - (v - lo) / (hi - lo)) * (H - pt - pb);
+
+  let g = "";
+  for (let v = lo; v <= hi + 1e-6; v += step) {
+    g += `<line x1="${pl}" x2="${W - pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" ${Math.abs(v) < 1e-6 ? 'stroke-width="1.5" stroke="var(--muted)"' : ""}/>`;
+    g += `<text x="${pl - 8}" y="${Y(v) + 4}" text-anchor="end" fill="var(--muted)" font-size="11">${usdK(v)}</text>`;
+  }
+  const xStep = s.years <= 12 ? 1 : s.years <= 25 ? 2 : 5;
+  for (let y = 0; y <= s.years; y += xStep) {
+    g += `<text x="${X(y * 12)}" y="${H - pb + 30}" text-anchor="middle" fill="var(--muted)" font-size="11">${y === 0 ? "Yr 0" : y}</text>`;
+  }
+  if (view !== "gap") {
+    const tri = (m, c, dy) => `<path d="M${X(m) - 4},${H - pb + dy + 6} L${X(m) + 4},${H - pb + dy + 6} L${X(m)},${H - pb + dy} Z" fill="var(${c})"/>`;
+    res.A.buys.forEach((b) => (g += tri(b.m, "--a", 3)));
+    res.B.buys.forEach((b) => (g += tri(b.m, "--b", 11)));
+  }
+  series.forEach((x) => {
+    const d = rows.map((r, i) => `${i ? "L" : "M"}${X(r.m).toFixed(1)},${Y(r[x.k]).toFixed(1)}`).join("");
+    g += `<path d="${d}" fill="none" stroke="var(${x.c})" stroke-width="2.5" stroke-linejoin="round" ${x.dash ? 'stroke-dasharray="6 4"' : ""}/>`;
+  });
+  g += `<line id="hover" y1="${pt}" y2="${H - pb}" stroke="var(--muted)" stroke-dasharray="3 3" visibility="hidden"/>`;
+  g += `<rect x="${pl}" y="${pt}" width="${W - pl - pr}" height="${H - pt - pb}" fill="transparent" id="hit"/>`;
+  svg.innerHTML = g;
+
+  const tip = $("#tip"), hover = svg.querySelector("#hover"), hit = svg.querySelector("#hit");
+  const move = (ev) => {
+    const rect = svg.getBoundingClientRect();
+    const px = ((ev.touches ? ev.touches[0].clientX : ev.clientX) - rect.left) * (W / rect.width);
+    const m = Math.max(0, Math.min(xMax, ((px - pl) / (W - pl - pr)) * xMax));
+    const r = rows.reduce((best, x) => (Math.abs(x.m - m) < Math.abs(best.m - m) ? x : best), rows[0]);
+    hover.setAttribute("x1", X(r.m)); hover.setAttribute("x2", X(r.m)); hover.setAttribute("visibility", "visible");
+    tip.style.display = "block";
+    tip.innerHTML = `<b>Year ${+(r.m / 12).toFixed(2)}</b><br>` +
+      series.map((x) => `<span style="color:var(${x.c})">${x.label}</span> ${usd(r[x.k])}`).join("<br>");
+    const tx = X(r.m) * rect.width / W;
+    tip.style.left = (tx > rect.width / 2 ? tx - tip.offsetWidth - 12 : tx + 12) + "px";
+    tip.style.top = "12px";
+  };
+  hit.addEventListener("mousemove", move);
+  hit.addEventListener("touchmove", move, { passive: true });
+  hit.addEventListener("mouseleave", () => { tip.style.display = "none"; hover.setAttribute("visibility", "hidden"); });
+}
+function niceStep(raw) {
+  const p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p;
+  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p;
+}
+
+// ---------- share / persistence ----------
+function encodeState() {
+  return Object.keys(DEFAULTS).filter((k) => state[k] !== DEFAULTS[k])
+    .map((k) => `${k}=${encodeURIComponent(state[k])}`).join("&");
+}
+function loadHash() {
+  const h = location.hash.slice(1);
+  if (!h) return;
+  for (const part of h.split("&")) {
+    const [k, v] = part.split("=");
+    if (!Object.hasOwn(DEFAULTS, k) || v === undefined) continue;
+    if (typeof DEFAULTS[k] === "string") {
+      try { state[k] = decodeURIComponent(v).slice(0, 30); } catch (e) {}
+      continue;
+    }
+    const num = parseFloat(v);
+    if (!isFinite(num)) continue;
+    state[k] = k in FIELD_BY_ID ? clampField(k, num) : num ? 1 : 0;   // non-knob keys are on/off flags
+  }
+}
+
+$("#share").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(location.href); $("#share").textContent = "Copied!"; }
+  catch (e) { prompt("Copy this link:", location.href); }
+  setTimeout(() => ($("#share").textContent = "Copy share link"), 1500);
+});
+$("#reset").addEventListener("click", () => { state = { ...DEFAULTS }; syncInputs(); clearPreset(); update(); });
+$("#theme").addEventListener("click", () => {
+  const root = document.documentElement;
+  const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  root.dataset.theme = dark ? "light" : "dark";
+  try { localStorage.setItem("car-theme", root.dataset.theme); } catch (e) {}
+});
+try { const t = localStorage.getItem("car-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+
+buildFields();
+loadHash();
+syncInputs();
+update();
+</script>
+</body>
+</html>
